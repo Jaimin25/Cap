@@ -458,6 +458,8 @@ pub struct CursorConfiguration {
     pub motion_blur: f32,
     #[serde(default = "yes")]
     pub use_svg: bool,
+    #[serde(default = "yes")]
+    pub use_macos_style: bool,
 }
 
 fn yes() -> bool {
@@ -480,6 +482,7 @@ impl Default for CursorConfiguration {
             raw: false,
             motion_blur: 0.5,
             use_svg: true,
+            use_macos_style: true,
         };
 
         if let Some(preset) = animation_style.preset() {

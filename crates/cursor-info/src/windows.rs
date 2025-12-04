@@ -1,6 +1,6 @@
 use strum::{EnumString, IntoStaticStr};
 
-use crate::{CursorShape, ResolvedCursor};
+use crate::{CursorShape, CursorShapeMacOS, ResolvedCursor};
 
 // https://learn.microsoft.com/en-us/windows/win32/menurc/about-cursors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumString, IntoStaticStr)]
@@ -136,18 +136,21 @@ impl CursorShapeWindows {
                 raw: include_str!("../assets/windows/pen.svg"),
                 hotspot: (0.055, 0.945),
             },
-            // Self::ScrolNS => todo!(),
-            // Self::ScrollWE => todo!(),
-            // Self::ScrollNSEW => todo!(),
-            // Self::ScrollN => todo!(),
-            // Self::ScrollS => todo!(),
-            // Self::ScrollW => todo!(),
-            // Self::ScrollE => todo!(),
-            // Self::ScrollNW => todo!(),
-            // Self::ScrollNE => todo!(),
-            // Self::ScrollSW => todo!(),
-            // Self::ScrollSE => todo!(),
-            // Self::ArrowCD => todo!(),
+            _ => return None,
+        })
+    }
+
+    pub fn to_macos_equivalent(&self) -> Option<CursorShapeMacOS> {
+        Some(match self {
+            Self::Arrow => CursorShapeMacOS::Arrow,
+            Self::IBeam => CursorShapeMacOS::IBeam,
+            Self::Cross => CursorShapeMacOS::Crosshair,
+            Self::SizeWE => CursorShapeMacOS::ResizeLeftRight,
+            Self::SizeNS => CursorShapeMacOS::ResizeUpDown,
+            Self::No => CursorShapeMacOS::OperationNotAllowed,
+            Self::Hand => CursorShapeMacOS::PointingHand,
+            Self::SizeAll => CursorShapeMacOS::OpenHand,
+            Self::Help => CursorShapeMacOS::ContextualMenu,
             _ => return None,
         })
     }

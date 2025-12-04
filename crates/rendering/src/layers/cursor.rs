@@ -31,6 +31,7 @@ pub struct CursorLayer {
     bind_group: Option<BindGroup>,
     cursors: HashMap<String, CursorTexture>,
     prev_is_svg_assets_enabled: Option<bool>,
+    prev_is_macos_style_enabled: Option<bool>,
 }
 
 struct Statics {
@@ -188,6 +189,7 @@ impl CursorLayer {
             bind_group: None,
             cursors: Default::default(),
             prev_is_svg_assets_enabled: None,
+            prev_is_macos_style_enabled: None,
         }
     }
 
@@ -270,12 +272,13 @@ impl CursorLayer {
             }
         }
 
-        // Remove all cursor assets if the svg configuration changes.
-        // it might change the texture.
-        //
-        // This would be better if it only invalidated the required assets but that would be more complicated.
-        if self.prev_is_svg_assets_enabled != Some(uniforms.project.cursor.use_svg) {
+        let use_macos_style = uniforms.project.cursor.use_macos_style;
+
+        if self.prev_is_svg_assets_enabled != Some(uniforms.project.cursor.use_svg)
+            || self.prev_is_macos_style_enabled != Some(use_macos_style)
+        {
             self.prev_is_svg_assets_enabled = Some(uniforms.project.cursor.use_svg);
+            self.prev_is_macos_style_enabled = Some(use_macos_style);
             self.cursors.drain();
         }
 
@@ -295,20 +298,27 @@ impl CursorLayer {
                 _ => None,
             };
 
-            // Attempt to find and load a higher-quality SVG cursor included in Cap.
-            // These are used instead of the OS provided cursor images when possible as the quality is better.
             if let Some(cursor_shape) = cursor_shape
                 && uniforms.project.cursor.use_svg
-                && let Some(info) = cursor_shape.resolve()
             {
-                cursor = CursorTexture::prepare_svg(constants, info.raw, info.hotspot.into())
-                    .map_err(|err| {
-                        error!(
-                            "Error loading SVG cursor {:?}: {err}",
-                            interpolated_cursor.cursor_id
-                        )
-                    })
-                    .ok();
+                let info = if use_macos_style {
+                    cursor_shape
+                        .resolve_as_macos()
+                        .or_else(|| cursor_shape.resolve())
+                } else {
+                    cursor_shape.resolve()
+                };
+
+                if let Some(info) = info {
+                    cursor = CursorTexture::prepare_svg(constants, info.raw, info.hotspot.into())
+                        .map_err(|err| {
+                            error!(
+                                "Error loading SVG cursor {:?}: {err}",
+                                interpolated_cursor.cursor_id
+                            )
+                        })
+                        .ok();
+                }
             }
 
             // If not we attempt to load the low-quality image cursor

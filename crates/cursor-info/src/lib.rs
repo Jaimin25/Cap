@@ -27,11 +27,19 @@ pub enum CursorShape {
 }
 
 impl CursorShape {
-    /// Resolve a cursor identifier to an asset and hotspot information
     pub fn resolve(&self) -> Option<ResolvedCursor> {
         match self {
             CursorShape::MacOS(cursor) => cursor.resolve(),
             CursorShape::Windows(cursor) => cursor.resolve(),
+        }
+    }
+
+    pub fn resolve_as_macos(&self) -> Option<ResolvedCursor> {
+        match self {
+            CursorShape::MacOS(cursor) => cursor.resolve(),
+            CursorShape::Windows(cursor) => cursor
+                .to_macos_equivalent()
+                .and_then(|macos_cursor| macos_cursor.resolve()),
         }
     }
 }

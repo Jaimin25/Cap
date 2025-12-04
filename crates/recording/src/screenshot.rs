@@ -30,10 +30,12 @@ use windows::Win32::Graphics::Direct3D11::{
 #[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Gdi::{
     BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, CreateCompatibleDC, CreateDIBSection,
-    DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, HBITMAP, HDC, ReleaseDC, SRCCOPY, SelectObject,
+    DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, HDC, ReleaseDC, SRCCOPY, SelectObject,
 };
 #[cfg(target_os = "windows")]
-use windows::Win32::UI::WindowsAndMessaging::{PW_RENDERFULLCONTENT, PrintWindow};
+use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::WindowsAndMessaging::PW_RENDERFULLCONTENT;
 
 #[cfg(target_os = "windows")]
 const WINDOWS_CAPTURE_UNSUPPORTED: &str =
@@ -182,27 +184,32 @@ fn try_fast_capture(target: &ScreenCaptureTarget) -> Option<RgbImage> {
 
 #[cfg(target_os = "windows")]
 fn shared_d3d_device() -> anyhow::Result<&'static ID3D11Device> {
-    static DEVICE: OnceLock<ID3D11Device> = OnceLock::new();
+    static DEVICE: OnceLock<Option<ID3D11Device>> = OnceLock::new();
 
-    DEVICE.get_or_try_init(|| {
-        let mut device = None;
-        unsafe {
-            D3D11CreateDevice(
-                None,
-                D3D_DRIVER_TYPE_HARDWARE,
-                HMODULE::default(),
-                Default::default(),
-                None,
-                D3D11_SDK_VERSION,
-                Some(&mut device),
-                None,
-                None,
-            )
-        }
-        .map_err(|e| anyhow!("Failed to create D3D11 device: {e:?}"))?;
-
-        device.ok_or_else(|| anyhow!("D3D11 device unavailable"))
-    })
+    DEVICE
+        .get_or_init(|| {
+            let mut device = None;
+            let result = unsafe {
+                D3D11CreateDevice(
+                    None,
+                    D3D_DRIVER_TYPE_HARDWARE,
+                    HMODULE::default(),
+                    Default::default(),
+                    None,
+                    D3D11_SDK_VERSION,
+                    Some(&mut device),
+                    None,
+                    None,
+                )
+            };
+            if result.is_ok() {
+                device
+            } else {
+                None
+            }
+        })
+        .as_ref()
+        .ok_or_else(|| anyhow!("D3D11 device unavailable"))
 }
 
 #[cfg(target_os = "windows")]
@@ -304,12 +311,12 @@ fn capture_bitmap_with(
         return Err(unsupported_error());
     }
 
-    if base_dc.0 == 0 {
+    if base_dc.is_invalid() {
         return Err(unsupported_error());
     }
 
     let mem_dc = unsafe { CreateCompatibleDC(Some(base_dc)) };
-    if mem_dc.0 == 0 {
+    if mem_dc.is_invalid() {
         return Err(unsupported_error());
     }
 
@@ -320,7 +327,7 @@ fn capture_bitmap_with(
             biHeight: -height,
             biPlanes: 1,
             biBitCount: 32,
-            biCompression: BI_RGB as u32,
+            biCompression: BI_RGB.0,
             biSizeImage: 0,
             biXPelsPerMeter: 0,
             biYPelsPerMeter: 0,
@@ -331,13 +338,15 @@ fn capture_bitmap_with(
     };
 
     let mut data = std::ptr::null_mut();
-    let bitmap = unsafe { CreateDIBSection(mem_dc, &mut info, DIB_RGB_COLORS, &mut data, None, 0) };
-    if bitmap.0 == 0 || data.is_null() {
-        unsafe {
-            DeleteDC(mem_dc);
+    let bitmap = unsafe { CreateDIBSection(Some(mem_dc), &mut info, DIB_RGB_COLORS, &mut data, None, 0) };
+    
+    let bitmap = match bitmap {
+        Ok(b) if !b.is_invalid() && !data.is_null() => b,
+        _ => {
+            let _ = unsafe { DeleteDC(mem_dc) };
+            return Err(unsupported_error());
         }
-        return Err(unsupported_error());
-    }
+    };
 
     let old_obj = unsafe { SelectObject(mem_dc, bitmap.into()) };
 
@@ -359,8 +368,8 @@ fn capture_bitmap_with(
 
     unsafe {
         SelectObject(mem_dc, old_obj);
-        DeleteObject(bitmap.into());
-        DeleteDC(mem_dc);
+        let _ = DeleteObject(bitmap.into());
+        let _ = DeleteDC(mem_dc);
     }
 
     result
@@ -394,14 +403,14 @@ fn capture_display_bounds(
                 0,
                 width,
                 height,
-                screen_dc,
+                Some(screen_dc),  // FIX: Wrap in Some()
                 src_x,
                 src_y,
                 SRCCOPY | CAPTUREBLT,
             )
         };
 
-        res.as_bool().then_some(()).ok_or_else(unsupported_error)
+        res.map_err(|_| unsupported_error())  // FIX: Use map_err instead of as_bool
     });
     unsafe {
         ReleaseDC(None, screen_dc);
@@ -415,7 +424,7 @@ fn capture_display_bounds(
 
 #[cfg(target_os = "windows")]
 fn capture_window_bitmap(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<Vec<u8>> {
-    let window_dc = unsafe { GetDC(hwnd) };
+    let window_dc = unsafe { GetDC(Some(hwnd)) };  // FIX: Wrap in Some()
     let result = capture_bitmap_with(window_dc, width, height, |mem_dc| {
         let res = unsafe {
             BitBlt(
@@ -424,31 +433,31 @@ fn capture_window_bitmap(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<
                 0,
                 width,
                 height,
-                window_dc,
+                Some(window_dc),  // FIX: Wrap in Some()
                 0,
                 0,
                 SRCCOPY | CAPTUREBLT,
             )
         };
 
-        res.as_bool().then_some(()).ok_or_else(unsupported_error)
+        res.map_err(|_| unsupported_error())  // FIX: Use map_err instead of as_bool
     });
     unsafe {
-        ReleaseDC(hwnd, window_dc);
+        ReleaseDC(Some(hwnd), window_dc);  // FIX: Wrap hwnd in Some()
     }
     result
 }
 
 #[cfg(target_os = "windows")]
 fn capture_window_print(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<Vec<u8>> {
-    let window_dc = unsafe { GetDC(hwnd) };
+    let window_dc = unsafe { GetDC(Some(hwnd)) };
     let result = capture_bitmap_with(window_dc, width, height, |mem_dc| {
-        let res = unsafe { PrintWindow(hwnd, mem_dc, PW_RENDERFULLCONTENT.0 as u32) };
+        let res = unsafe { PrintWindow(hwnd, mem_dc, PRINT_WINDOW_FLAGS(PW_RENDERFULLCONTENT)) };  // FIX: Wrap PW_RENDERFULLCONTENT in PRINT_WINDOW_FLAGS
 
-        res.as_bool().then_some(()).ok_or_else(unsupported_error)
+        res.as_bool().then_some(()).ok_or_else(unsupported_error)  // PrintWindow returns BOOL, not Result
     });
     unsafe {
-        ReleaseDC(hwnd, window_dc);
+        ReleaseDC(Some(hwnd), window_dc);
     }
     result
 }
@@ -568,7 +577,7 @@ fn try_fast_capture(target: &ScreenCaptureTarget) -> Option<RgbImage> {
     let res = rx.recv_timeout(Duration::from_millis(500));
     let _ = capturer.stop();
 
-    let image = res.ok()??;
+    let image = res.ok()?.ok()?;  // FIX: Change ?? to .ok()?
     debug!("Windows fast capture completed in {:?}", start.elapsed());
     Some(image)
 }
