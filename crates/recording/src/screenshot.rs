@@ -202,11 +202,7 @@ fn shared_d3d_device() -> anyhow::Result<&'static ID3D11Device> {
                     None,
                 )
             };
-            if result.is_ok() {
-                device
-            } else {
-                None
-            }
+            if result.is_ok() { device } else { None }
         })
         .as_ref()
         .ok_or_else(|| anyhow!("D3D11 device unavailable"))
@@ -338,8 +334,9 @@ fn capture_bitmap_with(
     };
 
     let mut data = std::ptr::null_mut();
-    let bitmap = unsafe { CreateDIBSection(Some(mem_dc), &mut info, DIB_RGB_COLORS, &mut data, None, 0) };
-    
+    let bitmap =
+        unsafe { CreateDIBSection(Some(mem_dc), &mut info, DIB_RGB_COLORS, &mut data, None, 0) };
+
     let bitmap = match bitmap {
         Ok(b) if !b.is_invalid() && !data.is_null() => b,
         _ => {
@@ -403,14 +400,14 @@ fn capture_display_bounds(
                 0,
                 width,
                 height,
-                Some(screen_dc),  // FIX: Wrap in Some()
+                Some(screen_dc), // FIX: Wrap in Some()
                 src_x,
                 src_y,
                 SRCCOPY | CAPTUREBLT,
             )
         };
 
-        res.map_err(|_| unsupported_error())  // FIX: Use map_err instead of as_bool
+        res.map_err(|_| unsupported_error()) // FIX: Use map_err instead of as_bool
     });
     unsafe {
         ReleaseDC(None, screen_dc);
@@ -424,7 +421,7 @@ fn capture_display_bounds(
 
 #[cfg(target_os = "windows")]
 fn capture_window_bitmap(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<Vec<u8>> {
-    let window_dc = unsafe { GetDC(Some(hwnd)) };  // FIX: Wrap in Some()
+    let window_dc = unsafe { GetDC(Some(hwnd)) }; // FIX: Wrap in Some()
     let result = capture_bitmap_with(window_dc, width, height, |mem_dc| {
         let res = unsafe {
             BitBlt(
@@ -433,17 +430,17 @@ fn capture_window_bitmap(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<
                 0,
                 width,
                 height,
-                Some(window_dc),  // FIX: Wrap in Some()
+                Some(window_dc), // FIX: Wrap in Some()
                 0,
                 0,
                 SRCCOPY | CAPTUREBLT,
             )
         };
 
-        res.map_err(|_| unsupported_error())  // FIX: Use map_err instead of as_bool
+        res.map_err(|_| unsupported_error()) // FIX: Use map_err instead of as_bool
     });
     unsafe {
-        ReleaseDC(Some(hwnd), window_dc);  // FIX: Wrap hwnd in Some()
+        ReleaseDC(Some(hwnd), window_dc); // FIX: Wrap hwnd in Some()
     }
     result
 }
@@ -452,9 +449,9 @@ fn capture_window_bitmap(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<
 fn capture_window_print(hwnd: HWND, width: i32, height: i32) -> anyhow::Result<Vec<u8>> {
     let window_dc = unsafe { GetDC(Some(hwnd)) };
     let result = capture_bitmap_with(window_dc, width, height, |mem_dc| {
-        let res = unsafe { PrintWindow(hwnd, mem_dc, PRINT_WINDOW_FLAGS(PW_RENDERFULLCONTENT)) };  // FIX: Wrap PW_RENDERFULLCONTENT in PRINT_WINDOW_FLAGS
+        let res = unsafe { PrintWindow(hwnd, mem_dc, PRINT_WINDOW_FLAGS(PW_RENDERFULLCONTENT)) }; // FIX: Wrap PW_RENDERFULLCONTENT in PRINT_WINDOW_FLAGS
 
-        res.as_bool().then_some(()).ok_or_else(unsupported_error)  // PrintWindow returns BOOL, not Result
+        res.as_bool().then_some(()).ok_or_else(unsupported_error) // PrintWindow returns BOOL, not Result
     });
     unsafe {
         ReleaseDC(Some(hwnd), window_dc);
@@ -577,7 +574,7 @@ fn try_fast_capture(target: &ScreenCaptureTarget) -> Option<RgbImage> {
     let res = rx.recv_timeout(Duration::from_millis(500));
     let _ = capturer.stop();
 
-    let image = res.ok()?.ok()?;  // FIX: Change ?? to .ok()?
+    let image = res.ok()?.ok()?; // FIX: Change ?? to .ok()?
     debug!("Windows fast capture completed in {:?}", start.elapsed());
     Some(image)
 }

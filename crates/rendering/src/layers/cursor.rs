@@ -31,7 +31,7 @@ pub struct CursorLayer {
     bind_group: Option<BindGroup>,
     cursors: HashMap<String, CursorTexture>,
     prev_is_svg_assets_enabled: Option<bool>,
-    prev_is_macos_style_enabled: Option<bool>,
+    prev_cursor_style: Option<CursorStyle>,
 }
 
 struct Statics {
@@ -189,7 +189,7 @@ impl CursorLayer {
             bind_group: None,
             cursors: Default::default(),
             prev_is_svg_assets_enabled: None,
-            prev_is_macos_style_enabled: None,
+            prev_cursor_style: None,
         }
     }
 
@@ -272,13 +272,13 @@ impl CursorLayer {
             }
         }
 
-        let use_macos_style = uniforms.project.cursor.use_macos_style;
+        let cursor_style = uniforms.project.cursor.style;
 
         if self.prev_is_svg_assets_enabled != Some(uniforms.project.cursor.use_svg)
-            || self.prev_is_macos_style_enabled != Some(use_macos_style)
+            || self.prev_cursor_style != Some(cursor_style)
         {
             self.prev_is_svg_assets_enabled = Some(uniforms.project.cursor.use_svg);
-            self.prev_is_macos_style_enabled = Some(use_macos_style);
+            self.prev_cursor_style = Some(cursor_style);
             self.cursors.drain();
         }
 
@@ -301,12 +301,15 @@ impl CursorLayer {
             if let Some(cursor_shape) = cursor_shape
                 && uniforms.project.cursor.use_svg
             {
-                let info = if use_macos_style {
-                    cursor_shape
+                let info = match cursor_style {
+                    CursorStyle::Macos => cursor_shape
                         .resolve_as_macos()
-                        .or_else(|| cursor_shape.resolve())
-                } else {
-                    cursor_shape.resolve()
+                        .or_else(|| cursor_shape.resolve()),
+                    CursorStyle::Tahoe => cursor_shape
+                        .resolve_as_tahoe()
+                        .or_else(|| cursor_shape.resolve_as_macos())
+                        .or_else(|| cursor_shape.resolve()),
+                    CursorStyle::Windows => cursor_shape.resolve(),
                 };
 
                 if let Some(info) = info {

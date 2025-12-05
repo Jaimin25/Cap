@@ -42,6 +42,15 @@ impl CursorShape {
                 .and_then(|macos_cursor| macos_cursor.resolve()),
         }
     }
+
+    pub fn resolve_as_tahoe(&self) -> Option<ResolvedCursor> {
+        match self {
+            CursorShape::MacOS(cursor) => cursor.to_tahoe_variant().and_then(|c| c.resolve()),
+            CursorShape::Windows(cursor) => cursor
+                .to_tahoe_equivalent()
+                .and_then(|macos_cursor| macos_cursor.resolve()),
+        }
+    }
 }
 
 impl fmt::Display for CursorShape {

@@ -11,6 +11,7 @@ import {
 	type AudioConfiguration,
 	type Camera,
 	type CursorConfiguration,
+	type CursorStyle,
 	commands,
 	type HotkeysConfiguration,
 	type ProjectConfiguration,
@@ -62,6 +63,7 @@ const DEFAULT_CURSOR: CursorConfiguration = {
 	raw: false,
 	motionBlur: 0,
 	useSvg: true,
+	style: "macos",
 };
 
 const DEFAULT_HOTKEYS: HotkeysConfiguration = {

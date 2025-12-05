@@ -154,6 +154,11 @@ impl CursorShapeWindows {
             _ => return None,
         })
     }
+
+    pub fn to_tahoe_equivalent(&self) -> Option<CursorShapeMacOS> {
+        self.to_macos_equivalent()
+            .map(|macos| macos.to_tahoe_variant().unwrap_or(macos))
+    }
 }
 
 #[cfg(target_os = "windows")]

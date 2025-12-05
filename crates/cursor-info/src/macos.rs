@@ -224,6 +224,35 @@ impl CursorShapeMacOS {
         })
     }
 
+    pub fn to_tahoe_variant(self) -> Option<Self> {
+        Some(match self {
+            Self::Arrow | Self::TahoeArrow => Self::TahoeArrow,
+            Self::ContextualMenu | Self::TahoeContextualMenu => Self::TahoeContextualMenu,
+            Self::ClosedHand | Self::TahoeClosedHand => Self::TahoeClosedHand,
+            Self::Crosshair | Self::TahoeCrosshair => Self::TahoeCrosshair,
+            Self::DisappearingItem | Self::TahoeDisappearingItem => return None,
+            Self::DragCopy | Self::TahoeDragCopy => Self::TahoeDragCopy,
+            Self::DragLink | Self::TahoeDragLink => Self::TahoeDragLink,
+            Self::IBeam | Self::TahoeIBeam => Self::TahoeIBeam,
+            Self::OpenHand | Self::TahoeOpenHand => Self::TahoeOpenHand,
+            Self::OperationNotAllowed | Self::TahoeOperationNotAllowed => {
+                Self::TahoeOperationNotAllowed
+            }
+            Self::PointingHand | Self::TahoePointingHand => Self::TahoePointingHand,
+            Self::ResizeDown | Self::TahoeResizeDown => Self::TahoeResizeDown,
+            Self::ResizeLeft | Self::TahoeResizeLeft => Self::TahoeResizeLeft,
+            Self::ResizeLeftRight | Self::TahoeResizeLeftRight => Self::TahoeResizeLeftRight,
+            Self::ResizeRight | Self::TahoeResizeRight => Self::TahoeResizeRight,
+            Self::ResizeUp | Self::TahoeResizeUp => Self::TahoeResizeUp,
+            Self::ResizeUpDown | Self::TahoeResizeUpDown => Self::TahoeResizeUpDown,
+            Self::IBeamVerticalForVerticalLayout | Self::TahoeIBeamVerticalForVerticalLayout => {
+                Self::TahoeIBeamVerticalForVerticalLayout
+            }
+            Self::TahoeZoomIn => Self::TahoeZoomIn,
+            Self::TahoeZoomOut => Self::TahoeZoomOut,
+        })
+    }
+
     /// Derive the cursor type from a hash
     /// macOS doesn't allow comparing `NSCursor` instances directly so we hash the image data.
     /// macOS cursor are also resolution-independent so this works.

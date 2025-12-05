@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use specta::Type;
 
@@ -404,6 +404,15 @@ pub enum CursorType {
 
 #[derive(Type, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub enum CursorStyle {
+    #[default]
+    Macos,
+    Tahoe,
+    Windows,
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum CursorAnimationStyle {
     Slow,
     #[default]
@@ -458,12 +467,34 @@ pub struct CursorConfiguration {
     pub motion_blur: f32,
     #[serde(default = "yes")]
     pub use_svg: bool,
-    #[serde(default = "yes")]
-    pub use_macos_style: bool,
+    #[serde(
+        default,
+        alias = "useMacosStyle",
+        deserialize_with = "deserialize_cursor_style"
+    )]
+    pub style: CursorStyle,
 }
 
 fn yes() -> bool {
     true
+}
+
+fn deserialize_cursor_style<'de, D>(deserializer: D) -> Result<CursorStyle, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum CursorStyleValue {
+        Style(CursorStyle),
+        MacosFlag(bool),
+    }
+
+    match CursorStyleValue::deserialize(deserializer)? {
+        CursorStyleValue::Style(style) => Ok(style),
+        CursorStyleValue::MacosFlag(true) => Ok(CursorStyle::Macos),
+        CursorStyleValue::MacosFlag(false) => Ok(CursorStyle::Windows),
+    }
 }
 
 impl Default for CursorConfiguration {
@@ -482,7 +513,7 @@ impl Default for CursorConfiguration {
             raw: false,
             motion_blur: 0.5,
             use_svg: true,
-            use_macos_style: true,
+            style: CursorStyle::default(),
         };
 
         if let Some(preset) = animation_style.preset() {
